@@ -21,7 +21,7 @@ static Layer *s_canvas;
 static Wx w;
 static bool s_have;
 static int s_page;
-static char s_msg[32] = "Finding you...";
+static char s_msg[64] = "Finding you...";
 static const char *DAYS[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 // ------------------------------------------------------------------ weather codes
@@ -358,7 +358,7 @@ static void canvas_draw(Layer *l, GContext *ctx) {
     graphics_context_set_fill_color(ctx, sky(2, true)); graphics_fill_rect(ctx, b, 0, GCornerNone);
     icon(ctx, 2, GPoint(b.size.w / 2, b.size.h * 38 / 100), b.size.w / 5, true, sky(2, true));
     text(ctx, "kWeather", FONT_KEY_GOTHIC_28_BOLD, GRect(0, b.size.h * 58 / 100, b.size.w, 32), GTextAlignmentCenter, GColorWhite);
-    text(ctx, s_msg, FONT_KEY_GOTHIC_18, GRect(10, b.size.h * 58 / 100 + 30, b.size.w - 20, 44), GTextAlignmentCenter, GColorWhite);
+    text(ctx, s_msg, FONT_KEY_GOTHIC_18, GRect(10, b.size.h * 58 / 100 + 30, b.size.w - 20, b.size.h * 42 / 100 - 30), GTextAlignmentCenter, GColorWhite);
     return;
   }
   switch (s_page) {
@@ -370,6 +370,9 @@ static void canvas_draw(Layer *l, GContext *ctx) {
 }
 
 // ------------------------------------------------------------------ phone
+static void no_answer(void *d) {
+  if (!s_have && strcmp(s_msg, "Finding you...") == 0) { strcpy(s_msg, "No answer from the phone. Open the Pebble app"); layer_mark_dirty(s_canvas); }
+}
 static void request(void) {
   DictionaryIterator *it;
   if (app_message_outbox_begin(&it) == APP_MSG_OK) { dict_write_uint8(it, MESSAGE_KEY_CMD, 1); app_message_outbox_send(); }
@@ -440,6 +443,7 @@ int main(void) {
   app_message_register_inbox_received(inbox);
   app_message_open(512, 64);
   tick_timer_service_subscribe(MINUTE_UNIT, tick);
+  app_timer_register(20000, no_answer, NULL);
   app_event_loop();
   window_destroy(s_win);
 }
