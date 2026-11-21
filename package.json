@@ -2,26 +2,67 @@
   "name": "kweather",
   "author": "Kherve",
   "version": "1.0.1",
-  "keywords": ["pebble-app"],
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
   "dependencies": {},
   "pebble": {
     "displayName": "kWeather",
     "uuid": "633ac18a-f0b7-4e1c-9725-9ae5a036a943",
     "sdkVersion": "3",
-    "enableMultiJS": false,
-    "targetPlatforms": ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"],
-    "capabilities": ["location"],
-    "watchapp": { "watchface": false },
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery",
+      "flint",
+      "gabbro"
+    ],
+    "capabilities": [
+      "location"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
     "messageKeys": {
-      "CITY": 0, "T": 1, "CODE": 2, "FEELS": 3, "HI": 4, "LO": 5, "WIND": 6, "HUM": 7, "ISDAY": 8,
-      "HOUR0": 9, "WDAY0": 10, "HT": 11, "HP": 12, "HMM": 13, "HC": 14,
-      "DC": 15, "DP": 16, "DHI": 17, "DLO": 18, "ERR": 19, "CMD": 20
+      "CITY": 0,
+      "T": 1,
+      "CODE": 2,
+      "FEELS": 3,
+      "HI": 4,
+      "LO": 5,
+      "WIND": 6,
+      "HUM": 7,
+      "ISDAY": 8,
+      "HOUR0": 9,
+      "WDAY0": 10,
+      "HT": 11,
+      "HP": 12,
+      "HMM": 13,
+      "HC": 14,
+      "DC": 15,
+      "DP": 16,
+      "DHI": 17,
+      "DLO": 18,
+      "ERR": 19,
+      "CMD": 20
     },
     "resources": {
       "media": [
-        { "type": "bitmap", "name": "IMAGE_MENU_ICON", "file": "images/menu_icon.png", "menuIcon": true }
+        {
+          "type": "bitmap",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/menu_icon.png",
+          "menuIcon": true
+        }
       ]
-    }
+    },
+    "usesPermissions": [
+      "Internet",
+      "Location"
+    ]
   }
 }
