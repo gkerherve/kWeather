@@ -5,7 +5,7 @@
 
 #define NH 24
 #define ND 7
-#define NPAGES 4
+#define NPAGES 3
 enum { K_SUN, K_PART, K_CLOUD, K_FOG, K_DRIZ, K_RAIN, K_SNOW, K_STORM };
 
 typedef struct {
@@ -237,77 +237,59 @@ static void header(GContext *ctx, GRect b, bool big, const char *t1, const char 
   text(ctx, t2, big ? FONT_KEY_GOTHIC_18 : FONT_KEY_GOTHIC_14, GRect(6, y + (big ? 30 : 25), W - 12, 22), GTextAlignmentCenter, c2);
 }
 
-static void page_rain(GContext *ctx, GRect b, bool big) {
+
+static GPoint s_curve[NH + 2];
+
+
+// rain bars (bottom band) and temperature curve (above) on one chart, next 24 h
+static void page_chart(GContext *ctx, GRect b, bool big) {
   int W = b.size.w, H = b.size.h;
   graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorOxfordBlue, GColorBlack)); graphics_fill_rect(ctx, b, 0, GCornerNone);
   char rb[32], rs[32]; rain_summary(rb, sizeof(rb), rs, sizeof(rs));
   header(ctx, b, big, rb, rs, PBL_IF_COLOR_ELSE(GColorCeleste, GColorWhite));
-  int mx = PBL_IF_ROUND_ELSE(28, 8), x0 = mx, x1 = W - mx - PBL_IF_ROUND_ELSE(0, 6);
-  int y0 = H * PBL_IF_ROUND_ELSE(38, 36) / 100, y1 = H - PBL_IF_ROUND_ELSE(40, 20);
-  const int N = 12;
-  // guide lines at 50% and 100%
+  int mx = PBL_IF_ROUND_ELSE(30, 10), x0 = mx, x1 = W - mx - PBL_IF_ROUND_ELSE(0, 6);
+  int ir = big ? 13 : 9;
+  int iy = H * PBL_IF_ROUND_ELSE(38, 35) / 100;
+  int yb = H - PBL_IF_ROUND_ELSE(38, 20);              // baseline
+  int rainH = (yb - iy) * 38 / 100;                    // rain band height
+  int ty0 = iy + ir + 16, ty1 = yb - rainH - 4;        // temperature band
+  // rain band: faint guide at 100%, one bar per hour
   graphics_context_set_stroke_width(ctx, 1);
   graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorCobaltBlue, GColorDarkGray));
-  for (int g = 1; g <= 2; g++) { int gy = y1 - (y1 - y0) * g / 2; for (int x = x0; x < x1; x += 4) graphics_draw_pixel(ctx, GPoint(x, gy)); }
-  graphics_draw_line(ctx, GPoint(x0, y1), GPoint(x1, y1));
-  int slot = (x1 - x0) / N, bw = slot - (big ? 4 : 3);
-  for (int i = 0; i < N; i++) {
-    int p = w.hp[i], mm = w.hmm[i];
-    int h = (y1 - y0) * p / 100; if (p > 0 && h < 2) h = 2;
-    GColor c = PBL_IF_COLOR_ELSE(mm == 0 ? GColorLiberty : mm < 10 ? GColorPictonBlue : mm < 40 ? GColorVividCerulean : GColorBlueMoon, GColorWhite);
-    graphics_context_set_fill_color(ctx, c);
-    int x = x0 + i * slot + (slot - bw) / 2;
-    if (h) graphics_fill_rect(ctx, GRect(x, y1 - h, bw, h), bw / 3, GCornersTop);
-    if (i % 3 == 0) {
-      char l[6]; if (i == 0) snprintf(l, sizeof(l), "Now"); else snprintf(l, sizeof(l), "%d", (w.hour0 + i) % 24);
-      text(ctx, l, FONT_KEY_GOTHIC_14, GRect(x - 10, y1 + 1, bw + 20, 18), GTextAlignmentCenter, PBL_IF_COLOR_ELSE(GColorCeleste, GColorWhite));
-    }
+  for (int x = x0; x < x1; x += 4) graphics_draw_pixel(ctx, GPoint(x, yb - rainH));
+  graphics_draw_line(ctx, GPoint(x0, yb), GPoint(x1, yb));
+  int step = (x1 - x0) * 100 / NH, bw = step / 100 - 1; if (bw < 2) bw = 2;
+  for (int i = 0; i < NH; i++) {
+    int p = w.hp[i], mm = w.hmm[i], h = rainH * p / 100; if (p > 0 && h < 2) h = 2;
+    if (!h) continue;
+    graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(mm == 0 ? GColorLiberty : mm < 10 ? GColorPictonBlue : mm < 40 ? GColorVividCerulean : GColorBlueMoon, GColorWhite));
+    graphics_fill_rect(ctx, GRect(x0 + i * step / 100, yb - h, bw, h), 1, GCornersTop);
   }
-  text(ctx, "100%", FONT_KEY_GOTHIC_09, GRect(x0, y0 - 11, 30, 12), GTextAlignmentLeft, PBL_IF_COLOR_ELSE(GColorPictonBlue, GColorWhite));
-}
-
-static GPoint s_curve[NH + 2];
-static void page_temp(GContext *ctx, GRect b, bool big) {
-  int W = b.size.w, H = b.size.h;
-  graphics_context_set_fill_color(ctx, GColorBlack); graphics_fill_rect(ctx, b, 0, GCornerNone);
+  // temperature curve
   int mn = 999, mxv = -999, imn = 0, imx = 0;
   for (int i = 0; i < NH; i++) { if (w.ht[i] < mn) { mn = w.ht[i]; imn = i; } if (w.ht[i] > mxv) { mxv = w.ht[i]; imx = i; } }
-  char t2[32]; snprintf(t2, sizeof(t2), "Next 24 h: %d° to %d°", mn, mxv);
-  header(ctx, b, big, "Temperature", t2, PBL_IF_COLOR_ELSE(GColorRajah, GColorWhite));
-  int mx = PBL_IF_ROUND_ELSE(30, 10), x0 = mx, x1 = W - mx - PBL_IF_ROUND_ELSE(0, 6);
-  int ir = big ? 14 : 10;
-  int iy = H * PBL_IF_ROUND_ELSE(38, 36) / 100;
-  int y0 = iy + ir + 18, y1 = H - PBL_IF_ROUND_ELSE(38, 20);
   int range = mxv - mn; if (range < 4) range = 4;
   for (int i = 0; i < NH; i++)
-    s_curve[i] = GPoint(x0 + i * (x1 - x0) / (NH - 1), y1 - 3 - (w.ht[i] - mn) * (y1 - y0 - 6) / range);
-  s_curve[NH] = GPoint(x1, y1); s_curve[NH + 1] = GPoint(x0, y1);
-  GPathInfo info = { NH + 2, s_curve };
-  GPath *p = gpath_create(&info);
-  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorBulgarianRose, GColorDarkGray));
-  gpath_draw_filled(ctx, p);
-  gpath_destroy(p);
+    s_curve[i] = GPoint(x0 + i * step / 100 + bw / 2, ty1 - (w.ht[i] - mn) * (ty1 - ty0) / range);
   graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorChromeYellow, GColorWhite));
   graphics_context_set_stroke_width(ctx, 3);
   for (int i = 0; i + 1 < NH; i++) graphics_draw_line(ctx, s_curve[i], s_curve[i + 1]);
-  // min and max markers
   char l[8];
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_circle(ctx, s_curve[imx], 3);
   snprintf(l, sizeof(l), "%d°", mxv);
-  text(ctx, l, FONT_KEY_GOTHIC_14_BOLD, GRect(s_curve[imx].x - 20, s_curve[imx].y - 19, 40, 18), GTextAlignmentCenter, GColorWhite);
+  text(ctx, l, FONT_KEY_GOTHIC_14_BOLD, GRect(s_curve[imx].x - 20, s_curve[imx].y - 19, 40, 18), GTextAlignmentCenter, PBL_IF_COLOR_ELSE(GColorChromeYellow, GColorWhite));
   if (imn != imx) {
     graphics_fill_circle(ctx, s_curve[imn], 3);
     snprintf(l, sizeof(l), "%d°", mn);
-    int ly = s_curve[imn].y - 19; if (ly < y0 - 4) ly = y0 - 4;
-    text(ctx, l, FONT_KEY_GOTHIC_14_BOLD, GRect(s_curve[imn].x - 20, ly, 40, 18), GTextAlignmentCenter, PBL_IF_COLOR_ELSE(GColorCeleste, GColorWhite));
+    text(ctx, l, FONT_KEY_GOTHIC_14_BOLD, GRect(s_curve[imn].x - 20, s_curve[imn].y - 19, 40, 18), GTextAlignmentCenter, PBL_IF_COLOR_ELSE(GColorCeleste, GColorWhite));
   }
-  // weather every 6 hours along the top, hours along the bottom
-  for (int i = 0; i < NH; i += 6) {
-    int x = x0 + (i + 1) * (x1 - x0) / (NH - 1);
-    icon(ctx, w.hc[i + 1], GPoint(x, iy), ir, is_day_hour(i + 1), GColorBlack);
-    char h[6]; snprintf(h, sizeof(h), "%d:00", (w.hour0 + i + 1) % 24);
-    text(ctx, h, FONT_KEY_GOTHIC_14, GRect(x - 20, y1 + 1, 40, 18), GTextAlignmentCenter, PBL_IF_COLOR_ELSE(GColorRajah, GColorWhite));
+  // weather icons along the top, hours along the bottom
+  for (int i = 1; i < NH; i += 6) {
+    int x = x0 + i * step / 100 + bw / 2;
+    icon(ctx, w.hc[i], GPoint(x, iy), ir, is_day_hour(i), PBL_IF_COLOR_ELSE(GColorOxfordBlue, GColorBlack));
+    char h[6]; snprintf(h, sizeof(h), "%d:00", (w.hour0 + i) % 24);
+    text(ctx, h, FONT_KEY_GOTHIC_14, GRect(x - 20, yb + 1, 40, 18), GTextAlignmentCenter, PBL_IF_COLOR_ELSE(GColorCeleste, GColorWhite));
   }
 }
 
@@ -359,9 +341,9 @@ static void dots(GContext *ctx, GRect b) {
   int W = b.size.w, H = b.size.h;
   for (int i = 0; i < NPAGES; i++) {
 #if defined(PBL_ROUND)
-    GPoint c = GPoint(W / 2 - 12 + i * 8, H - 8);
+    GPoint c = GPoint(W / 2 - 8 + i * 8, H - 8);
 #else
-    GPoint c = GPoint(W - 4, H / 2 - 12 + i * 8);
+    GPoint c = GPoint(W - 4, H / 2 - 8 + i * 8);
 #endif
     graphics_context_set_fill_color(ctx, i == s_page ? GColorWhite : PBL_IF_COLOR_ELSE(GColorLightGray, GColorDarkGray));
     graphics_fill_circle(ctx, c, i == s_page ? 3 : 2);
@@ -381,8 +363,7 @@ static void canvas_draw(Layer *l, GContext *ctx) {
   }
   switch (s_page) {
     case 0: page_now(ctx, b, big); break;
-    case 1: page_rain(ctx, b, big); break;
-    case 2: page_temp(ctx, b, big); break;
+    case 1: page_chart(ctx, b, big); break;
     default: page_week(ctx, b, big);
   }
   dots(ctx, b);
